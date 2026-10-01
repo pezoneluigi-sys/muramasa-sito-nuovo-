@@ -1,0 +1,4 @@
+# Il sito è un solo file HTML: Netlify lo pubblica così com'è, senza build.
+[build]
+  publish = "."
+  command = "echo 'Sito statico, nessuna build'"
