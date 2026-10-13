@@ -645,10 +645,16 @@ const FRASI = {
   function registra(dati) {
     if (!CONFIG.registro) return;
     const corpo = JSON.stringify(Object.assign({ azione: "nuovo", canale: "Sito", provenienza: PROVENIENZA }, dati));
+    // Riserva: alcuni browser (per esempio con il blocco tracker) fermano i beacon, quindi si usa prima fetch.
+    // Se lo stesso ordine arriva due volte, il registro lo riconosce dal codice e non lo riscrive.
+    const beacon = () => {
+      try { navigator.sendBeacon && navigator.sendBeacon(CONFIG.registro, new Blob([corpo], { type: "text/plain;charset=UTF-8" })); } catch (e) { /* niente */ }
+    };
     try {
-      if (navigator.sendBeacon && navigator.sendBeacon(CONFIG.registro, new Blob([corpo], { type: "text/plain;charset=UTF-8" }))) return;
-    } catch (e) { /* si prova con fetch */ }
-    try { fetch(CONFIG.registro, { method: "POST", body: corpo, mode: "no-cors", keepalive: true }).catch(() => {}); } catch (e) { /* registro non raggiungibile */ }
+      fetch(CONFIG.registro, { method: "POST", body: corpo, mode: "no-cors", keepalive: true }).catch(beacon);
+    } catch (e) {
+      beacon();
+    }
   }
 
   /* ---------- Catalogo ---------- */
