@@ -2,3 +2,12 @@
 [build]
   publish = "."
   command = "echo 'Sito statico, nessuna build'"
+
+# Registro ordini: il sito manda gli ordini a /registro-ordini sul suo stesso indirizzo,
+# e Netlify li passa al foglio Google. Così i browser che bloccano le richieste
+# verso altri siti (per esempio Brave) non fermano la registrazione.
+[[redirects]]
+  from = "/registro-ordini"
+  to = "https://script.google.com/macros/s/AKfycbw9WIAjBBs0nOKdW-X0u6SQEA7U7F5uNAhjnpPKp9OAHfnwgew9v7HVcHxpoXVabQnh/exec"
+  status = 200
+  force = true
