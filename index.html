@@ -39,9 +39,10 @@ const CONFIG = {
   sito: "https://muramasasushi.netlify.app/",
   preparazioneMinuti: 30,             // tempo minimo prima del ritiro
   sogliaFesta: 50,                    // sopra questo totale il cactus festeggia
+  registro: "https://script.google.com/macros/s/AKfycbw9WIAjBBs0nOKdW-X0u6SQEA7U7F5uNAhjnpPKp9OAHfnwgew9v7HVcHxpoXVabQnh/exec",  // indirizzo del registro ordini (foglio Google); vuoto = non registra
 
   // Orari: 0 = domenica, 1 = lunedì, 2 = martedì ... 6 = sabato.
-  // Se la domenica fai anche pranzo: 0: [["12:00", "15:00"], ["18:00", "24:00"]]
+  // Se la domenica fai anche pranzo: 0: [["12:00", "14:30"], ["18:00", "24:00"]]
   orari: {
     3: [["18:00", "24:00"]],
     4: [["18:00", "24:00"]],
@@ -49,6 +50,8 @@ const CONFIG = {
     6: [["18:00", "24:00"]],
     0: [["18:00", "24:00"]]
   }
+  // Provenienza degli ordini: aggiungi ?da= all'indirizzo del sito.
+  // Esempi: bio Instagram ?da=instagram, scheda Google ?da=google, volantino ?da=volantino
 };
 
 const MENU = [
@@ -601,6 +604,53 @@ const FRASI = {
   const capital = s => s.charAt(0).toUpperCase() + s.slice(1);
   const waLink = text => "https://wa.me/" + CONFIG.whatsapp + (text ? "?text=" + encodeURIComponent(text) : "");
 
+  /* ---------- Da dove arriva il cliente ---------- */
+  const FONTI = { instagram: "Instagram", ig: "Instagram", google: "Google", maps: "Google Maps", facebook: "Facebook", tiktok: "TikTok", whatsapp: "WhatsApp", volantino: "Volantino", busta: "Busta", qr: "QR code" };
+  const KEY_FONTE = "muramasa-provenienza-v1";
+  function leggiProvenienza() {
+    let fonte = "";
+    try {
+      const url = new URL(window.location.href);
+      const da = (url.searchParams.get("da") || "").trim().toLowerCase();
+      if (da) {
+        fonte = FONTI[da] || capital(da.replace(/[-_]+/g, " ")).slice(0, 40);
+        url.searchParams.delete("da");
+        history.replaceState(null, "", url.pathname + url.search + url.hash);
+      }
+    } catch (e) { /* indirizzo non leggibile */ }
+    if (!fonte && document.referrer) {
+      try {
+        const host = new URL(document.referrer).hostname.replace(/^www\./, "");
+        if (host && host !== window.location.hostname) {
+          fonte = /instagram/.test(host) ? "Instagram" : /(^|\.)google\./.test(host) ? "Google" : /facebook|fb\.com/.test(host) ? "Facebook" : /tiktok/.test(host) ? "TikTok" : host;
+        }
+      } catch (e) { /* provenienza sconosciuta */ }
+    }
+    try {
+      if (fonte) { localStorage.setItem(KEY_FONTE, JSON.stringify({ fonte: fonte, quando: Date.now() })); return fonte; }
+      const salvata = JSON.parse(localStorage.getItem(KEY_FONTE) || "null");
+      if (salvata && Date.now() - salvata.quando < 7 * 864e5) return salvata.fonte;
+    } catch (e) { /* memoria non disponibile */ }
+    return fonte || "Link diretto";
+  }
+  const PROVENIENZA = leggiProvenienza();
+
+  /* ---------- Registro ordini (foglio Google «Ordini Muramasa») ---------- */
+  const LETTERE = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  function nuovoCodice() {
+    const n = new Uint32Array(5);
+    try { crypto.getRandomValues(n); } catch (e) { for (let i = 0; i < 5; i++) n[i] = Math.floor(Math.random() * 4294967296); }
+    return Array.from(n, v => LETTERE[v % LETTERE.length]).join("");
+  }
+  function registra(dati) {
+    if (!CONFIG.registro) return;
+    const corpo = JSON.stringify(Object.assign({ azione: "nuovo", canale: "Sito", provenienza: PROVENIENZA }, dati));
+    try {
+      if (navigator.sendBeacon && navigator.sendBeacon(CONFIG.registro, new Blob([corpo], { type: "text/plain;charset=UTF-8" }))) return;
+    } catch (e) { /* si prova con fetch */ }
+    try { fetch(CONFIG.registro, { method: "POST", body: corpo, mode: "no-cors", keepalive: true }).catch(() => {}); } catch (e) { /* registro non raggiungibile */ }
+  }
+
   /* ---------- Catalogo ---------- */
   const CATALOGO = new Map();
   MENU.forEach(c => {
@@ -653,11 +703,10 @@ const FRASI = {
       let apertoOra = false;
       fasce(d).forEach(r => {
         let start = r[0] + CONFIG.preparazioneMinuti;
-        if (n === 0) {
-          if (min >= r[0] && min < r[1]) apertoOra = true;
-          start = Math.max(start, Math.ceil((min + CONFIG.preparazioneMinuti) / 15) * 15);
-        }
+        if (n === 0) start = Math.max(start, Math.ceil((min + CONFIG.preparazioneMinuti) / 15) * 15);
+        const prima = slots.length;
         for (let m = start; m <= r[1] - 30; m += 15) slots.push(m);
+        if (n === 0 && min >= r[0] && min < r[1] && slots.length > prima) apertoOra = true;
       });
       if (slots.length) return { giorno: nomeGiorno(d, n), slots, apertoOra };
     }
@@ -785,7 +834,8 @@ const FRASI = {
 
   /* ---------- Ordine ---------- */
   let ordineInviato = false;
-  const form = { nome: "", ritiro: "", note: "" };
+  const form = { nome: "", ritiro: "", note: "", codice: "" };
+  let ultimoInvio = null;
 
   function renderOrdine() {
     const body = $("ordine-body"), foot = $("ordine-foot");
@@ -834,12 +884,15 @@ const FRASI = {
   }
 
   function messaggioOrdine() {
-    const r = [
-      "*NUOVO ORDINE MURAMASA* 🍣", "",
+    const r = ["*NUOVO ORDINE MURAMASA* 🍣"];
+    if (form.codice) r.push("🔖 *Codice:* " + form.codice);
+    r.push(
+      "",
       "👤 *Cliente:* " + form.nome,
       "🛍️ *Modalità:* ritiro al locale",
-      "🕒 *Ritiro:* " + form.ritiro
-    ];
+      "🕒 *Ritiro:* " + form.ritiro,
+      "📍 *Provenienza:* " + PROVENIENZA
+    );
     if (form.note) r.push("📝 *Note:* " + form.note);
     r.push("", "----------------------------");
     Object.keys(cart).forEach(id => {
@@ -863,6 +916,18 @@ const FRASI = {
     const err = $("o-err");
     if (!form.nome) { err.textContent = "Scrivi il tuo nome per ordinare."; err.hidden = false; $("o-nome").focus(); return; }
     if (!form.ritiro) { err.textContent = "Scegli quando passi a ritirare."; err.hidden = false; $("o-ritiro").focus(); return; }
+    // Lo stesso ordine reinviato entro 30 minuti tiene il suo codice e non si registra due volte
+    const firma = JSON.stringify([cart, form.nome, form.ritiro, form.note]);
+    if (ultimoInvio && ultimoInvio.firma === firma && Date.now() - ultimoInvio.quando < 30 * 60000) {
+      form.codice = ultimoInvio.codice;
+    } else {
+      form.codice = nuovoCodice();
+      registra({
+        tipo: "Ordine", codice: form.codice, nome: form.nome, modalita: "Ritiro", ritiro: form.ritiro, note: form.note,
+        righe: Object.keys(cart).map(id => ({ q: cart[id], nome: CATALOGO.get(id).nome })), totale: total()
+      });
+      ultimoInvio = { firma: firma, codice: form.codice, quando: Date.now() };
+    }
     apriWhatsApp(messaggioOrdine());
     ordineInviato = true;
     renderOrdine();
@@ -881,7 +946,9 @@ const FRASI = {
     const errore = !da ? "Scrivi il tuo nome." : !per ? "Scrivi per chi è il regalo." : !(importo > 0) ? "Scegli un importo." : "";
     if (errore) { err.textContent = errore; err.hidden = false; return; }
     err.hidden = true;
-    apriWhatsApp(["*RICHIESTA GIFT CARD* 🎁", "", "⭐ *Da parte di:* " + da, "⭐ *Per:* " + per, "💶 *Importo:* " + money(importo), "",
+    const codice = nuovoCodice();
+    registra({ tipo: "Gift card", codice: codice, nome: da, totale: importo, note: "Per: " + per });
+    apriWhatsApp(["*RICHIESTA GIFT CARD* 🎁", "🔖 *Codice:* " + codice, "", "⭐ *Da parte di:* " + da, "⭐ *Per:* " + per, "💶 *Importo:* " + money(importo), "📍 *Provenienza:* " + PROVENIENZA, "",
       "----------------------------", "Vorrei acquistare questa gift card. Attendo le istruzioni per il pagamento."].join("\n"));
     closeDialog($("dlg-gift"));
   }
@@ -911,7 +978,9 @@ const FRASI = {
     const errore = !nome ? "Scrivi il tuo nome." : !iso ? "Scegli il giorno." : !ora ? "Scegli l'orario di arrivo." : "";
     if (errore) { err.textContent = errore; err.hidden = false; return; }
     const giorno = dataDa(iso).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
-    apriWhatsApp(["*PRENOTAZIONE SGABELLO* 🪑", "", "👤 *Nome:* " + nome, "🪑 *Posti:* " + posti, "📅 *Giorno:* " + giorno, "🕒 *Arrivo:* " + ora, "",
+    const codice = nuovoCodice();
+    registra({ tipo: "Sgabello", codice: codice, nome: nome, ritiro: giorno + " alle " + ora, note: posti + (posti === 1 ? " posto" : " posti"), totale: 0 });
+    apriWhatsApp(["*PRENOTAZIONE SGABELLO* 🪑", "🔖 *Codice:* " + codice, "", "👤 *Nome:* " + nome, "🪑 *Posti:* " + posti, "📅 *Giorno:* " + giorno, "🕒 *Arrivo:* " + ora, "📍 *Provenienza:* " + PROVENIENZA, "",
       "----------------------------", "Vorrei prenotare per mangiare al bancone."].join("\n"));
     closeDialog($("dlg-sgabello"));
   }
@@ -921,10 +990,13 @@ const FRASI = {
     const contatto = CONFIG.email ? "l'indirizzo email " + esc(CONFIG.email) : "WhatsApp o telefono al " + esc(CONFIG.telefono);
     $("privacy-body").innerHTML =
       "<h3>Chi tratta i dati</h3><p>Il titolare del trattamento è " + esc(CONFIG.titolare) + ", " + esc(CONFIG.via) + ", " + esc(CONFIG.cap + " " + CONFIG.citta + " (" + CONFIG.provincia + ")") + ", P.IVA " + esc(CONFIG.piva) + ". Per qualsiasi richiesta puoi scrivere a " + contatto + ".</p>" +
-      "<h3>Quali dati e perché</h3><p>Il sito è un menu digitale: non ci sono account e non salviamo i tuoi dati su un nostro database. Nome, orario e note che inserisci servono solo a comporre il messaggio che tu invii su WhatsApp, per preparare il tuo ordine o la tua richiesta.</p>" +
-      "<h3>Dopo l'invio</h3><p>Il messaggio viaggia su WhatsApp, secondo le regole di Meta. Lo conserviamo per il tempo necessario a gestire l'ordine e per gli obblighi di legge.</p>" +
+      "<h3>Quali dati e perché</h3><p>Il sito è un menu digitale e non ci sono account. Nome, piatti, orario e note che inserisci servono a comporre il messaggio che invii su WhatsApp, per preparare il tuo ordine o la tua richiesta." +
+      (CONFIG.registro
+        ? " Quando premi invia, gli stessi dati vengono annotati anche nel nostro registro ordini, un foglio Google privato che usiamo solo per gestire gli ordini e tenere la contabilità.</p>"
+        : " Non li salviamo su un nostro database.</p>") +
+      "<h3>Dopo l'invio</h3><p>Il messaggio viaggia su WhatsApp, secondo le regole di Meta. " + (CONFIG.registro ? "Messaggi e registro li conserviamo" : "Lo conserviamo") + " per il tempo necessario a gestire l'ordine e per gli obblighi di legge.</p>" +
       "<h3>I tuoi diritti</h3><p>Puoi chiedere in ogni momento di accedere ai tuoi dati, correggerli o cancellarli (articoli 15–22 del Regolamento UE 2016/679), scrivendo a " + contatto + ".</p>" +
-      "<h3>Cookie e memoria del browser</h3><p>Il sito non usa cookie di profilazione né statistiche. Usa solo la memoria del tuo browser per ricordare il carrello: è uno strumento tecnico e non richiede consenso. I caratteri tipografici arrivano dai server di Google Fonts, che riceve l'indirizzo IP di chi visita.</p>";
+      "<h3>Cookie e memoria del browser</h3><p>Il sito non usa cookie di profilazione né statistiche. Usa solo la memoria del tuo browser per ricordare il carrello e da dove sei arrivato (per esempio da Instagram): questa informazione compare nel messaggio che invii, così sai sempre cosa ci arriva. Sono strumenti tecnici e non richiedono consenso. I caratteri tipografici arrivano dai server di Google Fonts, che riceve l'indirizzo IP di chi visita.</p>";
   }
 
   /* ---------- Finestre ---------- */
