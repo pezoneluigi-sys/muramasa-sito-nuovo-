@@ -622,7 +622,7 @@ const FRASI = {
       try {
         const host = new URL(document.referrer).hostname.replace(/^www\./, "");
         if (host && host !== window.location.hostname) {
-          fonte = /instagram/.test(host) ? "Instagram" : /(^|\.)google\./.test(host) ? "Google" : /facebook|fb\.com/.test(host) ? "Facebook" : /tiktok/.test(host) ? "TikTok" : host;
+          fonte = /instagram/.test(host) ? "Instagram" : /(^|\.)google\./.test(host) ? "Google" : /facebook|fb\.com/.test(host) ? "Facebook" : /tiktok/.test(host) ? "TikTok" : /(^|\.)wl\.co$|whatsapp/.test(host) ? "WhatsApp" : host;
         }
       } catch (e) { /* provenienza sconosciuta */ }
     }
