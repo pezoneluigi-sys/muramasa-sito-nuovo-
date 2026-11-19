@@ -4,13 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Muramasa Sushi Lab | Sushi da asporto a Parete (CE)</title>
-<meta name="description" content="Sushi artigianale da asporto a Parete (Caserta). Pesce sfilettato da noi, rollato al momento. Scegli dal menu e ordina su WhatsApp per il ritiro.">
+<meta name="description" content="Sushi artigianale da asporto a Parete (Caserta). Pesce sfilettato da noi, rollato al momento. Ordina su WhatsApp: ritiro al locale o consegna a casa nel weekend.">
 <link rel="canonical" href="https://muramasasushi.netlify.app/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Muramasa Sushi Lab">
 <meta property="og:locale" content="it_IT">
 <meta property="og:title" content="Muramasa Sushi Lab, il sushi che punge">
-<meta property="og:description" content="Sushi artigianale da asporto a Parete. Scegli dal menu e ordina su WhatsApp.">
+<meta property="og:description" content="Sushi artigianale a Parete: ritiro al locale o consegna a casa nel weekend. Scegli dal menu e ordina su WhatsApp.">
 <meta property="og:url" content="https://muramasasushi.netlify.app/">
 <meta property="og:image" content="https://muramasasushi.netlify.app/og-image.jpg">
 <meta name="theme-color" content="#F4EAD6" media="(prefers-color-scheme: light)">
@@ -49,6 +49,19 @@ const CONFIG = {
     5: [["18:00", "24:00"]],
     6: [["18:00", "24:00"]],
     0: [["18:00", "24:00"]]
+  },
+
+  // Consegna a casa. Giorni come negli orari: 5 = venerdì, 6 = sabato, 0 = domenica.
+  // Per toglierla dal sito: giorni: []
+  consegna: {
+    giorni: [5, 6, 0],
+    minuti: 45,                         // tempo minimo prima della consegna
+    zone: [
+      { nome: "Parete", costo: 3.00 },
+      { nome: "Lusciano", costo: 3.00 },
+      { nome: "Trentola Ducenta", costo: 3.00 },
+      { nome: "Aversa", costo: 5.00 }
+    ]
   }
   // Provenienza degli ordini: aggiungi ?da= all'indirizzo del sito.
   // Esempi: bio Instagram ?da=instagram, scheda Google ?da=google, volantino ?da=volantino
@@ -258,6 +271,7 @@ const FRASI = {
   .bubble--hero.show { opacity: 1; transform: none; }
   h1 { font-size: clamp(3.3rem, 15.5vw, 5.4rem); line-height: .98; }
   .lede { font-size: 1.125rem; margin: 14px 0 0; max-width: 30em; }
+  .hero-consegna { margin: 8px 0 0; font-weight: 700; }
   .status { display: inline-flex; align-items: center; gap: 9px; margin: 16px 0 0; padding: 6px 14px; border-radius: 999px; background: var(--card); border: 1.5px solid var(--line); font-weight: 700; font-size: .9375rem; }
   .status .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
   .status.is-open .dot { background: var(--open); box-shadow: 0 0 0 3px rgba(62, 138, 58, .22); }
@@ -308,6 +322,10 @@ const FRASI = {
   .chips::-webkit-scrollbar { display: none; }
   .chip { flex: none; height: 38px; padding: 0 15px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--card); font-weight: 700; font-size: .875rem; }
   .chip[aria-pressed="true"] { background: var(--indigo); color: var(--on-indigo); border-color: var(--indigo-deep); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  }
+  :root[data-theme="dark"] .chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   .cats { display: grid; gap: 0 26px; }
   @media (min-width: 900px) { .cats { grid-template-columns: 1fr 1fr; align-items: start; } }
   .cat { margin-top: 30px; scroll-margin-top: calc(var(--nav-h) + env(safe-area-inset-top, 0px) + 12px); }
@@ -414,6 +432,9 @@ const FRASI = {
   .total strong { font-family: var(--font-display); font-weight: 400; font-size: 2rem; font-variant-numeric: tabular-nums; }
   .hint { margin: 10px 0 0; font-size: .875rem; color: var(--muted); text-align: center; }
   .choice { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip:disabled { opacity: .45; }
+  .nota { margin: 8px 0 0; font-size: .875rem; color: var(--muted); }
+  .riga { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 4px; font-size: .9375rem; font-weight: 700; color: var(--muted); }
   .done { text-align: center; }
   .done .sheet-art { max-width: 340px; margin: 0 auto 14px; }
   .done h3 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; margin: 4px 0 0; }
@@ -452,9 +473,10 @@ const FRASI = {
     <div class="hero-copy">
       <h1 id="titolo">Il sushi<br>che punge.</h1>
       <p class="lede">Sushi artigianale da asporto a Parete. Pesce sfilettato da noi, rollato al momento.</p>
+      <p class="hero-consegna" id="hero-consegna" hidden></p>
       <p class="status" id="status" aria-live="polite"><span class="dot" aria-hidden="true"></span><span id="status-text">Via Salvo D'Acquisto 21, Parete</span></p>
       <div class="hero-cta">
-        <a class="btn btn--rope" href="#menu">Ordina per il ritiro</a>
+        <a class="btn btn--rope" href="#menu">Ordina ora</a>
         <div class="hero-links">
           <button class="link-btn" type="button" data-open="dlg-gift">Regala una gift card</button>
           <button class="link-btn" type="button" data-open="dlg-sgabello">Prenota uno sgabello</button>
@@ -494,6 +516,7 @@ const FRASI = {
 
   <section class="block info" aria-labelledby="info-t">
     <h2 id="info-t">Da sapere</h2>
+    <p id="info-consegna" hidden></p>
     <p>Il pesce servito crudo viene abbattuto come previsto dalla legge.</p>
     <p>Per ogni piatto trovi gli allergeni. Se hai un'intolleranza, scrivila nelle note dell'ordine e ti confermiamo cosa puoi mangiare.</p>
   </section>
@@ -681,7 +704,19 @@ const FRASI = {
   const total = () => Object.keys(cart).reduce((s, id) => s + CATALOGO.get(id).prezzo * cart[id], 0);
 
   /* ---------- Orari (sempre ora italiana) ---------- */
-  const romeNow = () => new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
+  // Solo nelle anteprime, mai sul sito vero, si può provare un altro giorno: ?giorno=venerdi
+  const GIORNO_PROVA = (function () {
+    try {
+      if (!/^deploy-preview-\d+--|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname)) return -1;
+      const g = plain(new URL(window.location.href).searchParams.get("giorno") || "");
+      return GIORNI.findIndex(x => plain(x) === g);
+    } catch (e) { return -1; }
+  })();
+  const romeNow = () => {
+    const d = new Date(new Date().toLocaleString("en-US", { timeZone: "Europe/Rome" }));
+    if (GIORNO_PROVA >= 0) d.setDate(d.getDate() + (GIORNO_PROVA - d.getDay() + 7) % 7);
+    return d;
+  };
   const toMin = t => { const p = t.split(":"); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10); };
   const hhmm = m => String(Math.floor(m / 60) % 24).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
   const orario = m => (m >= 1440 ? "mezzanotte" : hhmm(m));
@@ -702,21 +737,52 @@ const FRASI = {
     return { open: false, text: CONFIG.via + ", " + CONFIG.citta };
   }
 
+  // Orari possibili in un giorno, ogni 15 minuti, con almeno «anticipo» minuti dall'apertura e da adesso.
+  function orariDelGiorno(d, n, min, anticipo) {
+    const slots = [];
+    let apertoOra = false;
+    fasce(d).forEach(r => {
+      let start = Math.ceil((r[0] + anticipo) / 15) * 15;
+      if (n === 0) start = Math.max(start, Math.ceil((min + anticipo) / 15) * 15);
+      const prima = slots.length;
+      for (let m = start; m <= r[1] - 30; m += 15) slots.push(m);
+      if (n === 0 && min >= r[0] && min < r[1] && slots.length > prima) apertoOra = true;
+    });
+    return { slots, apertoOra };
+  }
+
+  // Il giorno dell'ordine: oggi, oppure il prossimo giorno di apertura se per oggi è tardi.
   function pianoRitiro() {
     const now = romeNow(), min = now.getHours() * 60 + now.getMinutes();
     for (let n = 0; n < 8; n++) {
-      const d = addDays(now, n), slots = [];
-      let apertoOra = false;
-      fasce(d).forEach(r => {
-        let start = r[0] + CONFIG.preparazioneMinuti;
-        if (n === 0) start = Math.max(start, Math.ceil((min + CONFIG.preparazioneMinuti) / 15) * 15);
-        const prima = slots.length;
-        for (let m = start; m <= r[1] - 30; m += 15) slots.push(m);
-        if (n === 0 && min >= r[0] && min < r[1] && slots.length > prima) apertoOra = true;
-      });
-      if (slots.length) return { giorno: nomeGiorno(d, n), slots, apertoOra };
+      const d = addDays(now, n), o = orariDelGiorno(d, n, min, CONFIG.preparazioneMinuti);
+      if (o.slots.length) return { giorno: nomeGiorno(d, n), slots: o.slots, apertoOra: o.apertoOra, data: d, n: n };
     }
     return null;
+  }
+
+  /* ---------- Consegna a casa ---------- */
+  const consegnaAttiva = () => !!(CONFIG.consegna && (CONFIG.consegna.giorni || []).length && (CONFIG.consegna.zone || []).length);
+  const zona = nome => (consegnaAttiva() && CONFIG.consegna.zone.find(z => z.nome === nome)) || null;
+  const elenco = list => (list.length > 1 ? list.slice(0, -1).join(", ") + " e " + list[list.length - 1] : list.join(""));
+  const aCitta = nome => (/^a/i.test(nome) ? "ad " : "a ") + nome;
+  const giorniConsegna = () => elenco([1, 2, 3, 4, 5, 6, 0].filter(g => CONFIG.consegna.giorni.indexOf(g) !== -1).map(g => GIORNI[g]));
+  // «3,00 € a Parete, Lusciano e Trentola Ducenta, 5,00 € ad Aversa»
+  function costiConsegna() {
+    const gruppi = [];
+    CONFIG.consegna.zone.forEach(z => {
+      const g = gruppi.find(x => x.costo === z.costo);
+      if (g) g.nomi.push(z.nome); else gruppi.push({ costo: z.costo, nomi: [z.nome] });
+    });
+    return gruppi.map(g => money(g.costo) + " " + aCitta(elenco(g.nomi))).join(", ");
+  }
+  // La consegna si fa nel giorno dell'ordine, solo nei giorni di consegna e con più anticipo del ritiro.
+  function pianoConsegna(base) {
+    if (!consegnaAttiva() || !base || CONFIG.consegna.giorni.indexOf(base.data.getDay()) === -1) return { ok: false, motivo: "giorno" };
+    const now = romeNow(), min = now.getHours() * 60 + now.getMinutes();
+    const o = orariDelGiorno(base.data, base.n, min, CONFIG.consegna.minuti);
+    if (!o.slots.length) return { ok: false, motivo: "tardi" };
+    return { ok: true, giorno: base.giorno, slots: o.slots, apertoOra: o.apertoOra };
   }
 
   function orariFooter() {
@@ -774,6 +840,12 @@ const FRASI = {
     $("foot-ig").textContent = "Instagram " + CONFIG.instagramNome;
     if (CONFIG.email) { $("foot-mail").href = "mailto:" + CONFIG.email; $("foot-mail").textContent = CONFIG.email; } else { $("foot-mail").hidden = true; }
     $("foot-legal").textContent = CONFIG.titolare + ", P.IVA " + CONFIG.piva;
+    if (consegnaAttiva()) {
+      $("hero-consegna").textContent = "Consegna a casa " + giorniConsegna() + ".";
+      $("hero-consegna").hidden = false;
+      $("info-consegna").textContent = "Consegna a casa " + giorniConsegna() + ": " + costiConsegna() + ". La scegli quando completi l'ordine.";
+      $("info-consegna").hidden = false;
+    }
   }
 
   function renderStatus() {
@@ -840,14 +912,17 @@ const FRASI = {
 
   /* ---------- Ordine ---------- */
   let ordineInviato = false;
-  const form = { nome: "", ritiro: "", note: "", codice: "" };
+  const form = { nome: "", ritiro: "", note: "", codice: "", modo: "Ritiro", zona: "", indirizzo: "" };
   let ultimoInvio = null;
+  const inConsegna = () => form.modo === "Consegna";
+  const costoConsegna = () => { const z = inConsegna() ? zona(form.zona) : null; return z ? z.costo : 0; };
+  const totaleOrdine = () => total() + costoConsegna();
 
   function renderOrdine() {
     const body = $("ordine-body"), foot = $("ordine-foot");
     if (ordineInviato) {
       body.innerHTML = '<div class="done">' + $("tpl-inviato").innerHTML +
-        "<h3>Ordine pronto su WhatsApp</h3><p>Se non l'hai ancora fatto, premi invia nella chat. Ti confermiamo l'orario di ritiro lì.</p></div>";
+        "<h3>Ordine pronto su WhatsApp</h3><p>Se non l'hai ancora fatto, premi invia nella chat. Ti confermiamo l'orario di " + (inConsegna() ? "consegna" : "ritiro") + " lì.</p></div>";
       foot.innerHTML = '<button class="btn btn--rope btn--block" type="button" id="svuota">Ho inviato, svuota il carrello</button>' +
         '<p class="hint"><button class="link-btn" type="button" id="riprova">Riapri WhatsApp</button></p>';
       return;
@@ -867,45 +942,74 @@ const FRASI = {
       '<div class="up"><div><strong>' + esc(x.nome) + "</strong><span>" + money(x.prezzo) + (x.descrizione ? ", " + esc(x.descrizione.toLowerCase()) : "") + "</span></div>" +
       '<button class="add" type="button" data-add="' + x.id + '" aria-label="Aggiungi ' + esc(x.nome) + '">+</button></div>'
     ).join("");
-    const piano = pianoRitiro();
+    const base = pianoRitiro(), cons = pianoConsegna(base);
+    if (inConsegna() && !cons.ok) form.modo = "Ritiro";
+    const consegna = inConsegna(), piano = consegna ? cons : base;
+    const anticipo = consegna ? CONFIG.consegna.minuti : CONFIG.preparazioneMinuti;
     let opzioni = '<option value="">Scegli un orario</option>';
     if (piano) {
-      if (piano.apertoOra) opzioni += '<option value="prima possibile (circa ' + CONFIG.preparazioneMinuti + ' minuti)">Prima possibile, circa ' + CONFIG.preparazioneMinuti + " minuti</option>";
+      if (piano.apertoOra) opzioni += '<option value="prima possibile (circa ' + anticipo + ' minuti)">Prima possibile, circa ' + anticipo + " minuti</option>";
       opzioni += '<optgroup label="' + esc(capital(piano.giorno)) + '">' +
         piano.slots.map(m => '<option value="' + esc(piano.giorno + " alle " + hhmm(m)) + '">' + hhmm(m) + "</option>").join("") + "</optgroup>";
     }
     body.innerHTML = '<ul class="lines">' + righe + "</ul>" +
       (extra ? "<h3>Completa l'ordine</h3><div class=\"upsell\">" + extra + "</div>" : "") +
-      "<h3>Per il ritiro</h3>" +
+      (consegnaAttiva() ? sceltaModoHTML(cons) : "<h3>Per il ritiro</h3>") +
       '<div class="field"><label for="o-nome">Nome</label><input id="o-nome" type="text" autocomplete="given-name" placeholder="Il tuo nome" value="' + esc(form.nome) + '"></div>' +
-      '<div class="field"><label for="o-ritiro">Quando passi' + (piano && !piano.apertoOra ? " (" + esc(piano.giorno) + ")" : "") + "</label>" +
+      (consegna ? campiConsegnaHTML() : "") +
+      '<div class="field"><label for="o-ritiro">' + (consegna ? "Quando te lo portiamo" : "Quando passi") + (piano && !piano.apertoOra ? " (" + esc(piano.giorno) + ")" : "") + "</label>" +
       (piano ? '<select id="o-ritiro">' + opzioni + "</select>" : '<input id="o-ritiro" type="text" placeholder="Giorno e ora">') + "</div>" +
-      '<div class="field"><label for="o-note">Note</label><textarea id="o-note" placeholder="Intolleranze, bacchette, richieste">' + esc(form.note) + "</textarea></div>" +
+      '<div class="field"><label for="o-note">Note</label><textarea id="o-note" placeholder="' + (consegna ? "Citofono, piano, contanti o carta, intolleranze" : "Intolleranze, bacchette, richieste") + '">' + esc(form.note) + "</textarea></div>" +
       '<p class="error" id="o-err" role="alert" hidden></p>';
     const sel = $("o-ritiro");
-    if (form.ritiro && sel.tagName === "SELECT" && Array.from(sel.options).some(o => o.value === form.ritiro)) sel.value = form.ritiro;
-    foot.innerHTML = '<div class="total"><span>Totale</span><strong>' + money(total()) + "</strong></div>" +
+    if (sel.tagName === "SELECT") {
+      if (form.ritiro && Array.from(sel.options).some(o => o.value === form.ritiro)) sel.value = form.ritiro; else form.ritiro = "";
+    }
+    renderPiede();
+  }
+
+  function sceltaModoHTML(cons) {
+    const nota = cons.ok ? "Consegna: " + costiConsegna() + "."
+      : cons.motivo === "tardi" ? "Per oggi le consegne sono finite: puoi passare a ritirare."
+      : "La consegna a casa c'è solo " + giorniConsegna() + ".";
+    return "<h3>Ritiro o consegna</h3>" +
+      '<div class="choice" role="group" aria-label="Ritiro o consegna">' +
+      '<button class="chip" type="button" data-modo="Ritiro" aria-pressed="' + !inConsegna() + '">Ritiro al locale</button>' +
+      '<button class="chip" type="button" data-modo="Consegna" aria-pressed="' + inConsegna() + '" aria-describedby="o-modo-nota"' + (cons.ok ? "" : " disabled") + ">Consegna a casa</button></div>" +
+      '<p class="nota" id="o-modo-nota">' + esc(nota) + "</p>";
+  }
+
+  function campiConsegnaHTML() {
+    return '<div class="field"><label for="o-zona">Comune</label><select id="o-zona"><option value="">Scegli il comune</option>' +
+      CONFIG.consegna.zone.map(z => '<option value="' + esc(z.nome) + '"' + (z.nome === form.zona ? " selected" : "") + ">" + esc(z.nome) + " (" + money(z.costo) + ")</option>").join("") + "</select></div>" +
+      '<div class="field"><label for="o-indirizzo">Via e numero civico</label><input id="o-indirizzo" type="text" autocomplete="address-line1" placeholder="Per esempio Via Roma 12" value="' + esc(form.indirizzo) + '"></div>';
+  }
+
+  function renderPiede() {
+    const z = inConsegna() ? zona(form.zona) : null;
+    $("ordine-foot").innerHTML =
+      (inConsegna() ? '<div class="riga"><span>' + (z ? "Consegna " + esc(aCitta(z.nome)) : "Consegna") + "</span><span>" + (z ? money(z.costo) : "scegli il comune") + "</span></div>" : "") +
+      '<div class="total"><span>Totale</span><strong>' + money(totaleOrdine()) + "</strong></div>" +
       '<button class="btn btn--rope btn--block" type="button" id="invia">Invia l\'ordine su WhatsApp</button>' +
       '<p class="hint">Si apre WhatsApp con l\'ordine già scritto: tu premi invia.</p>';
   }
 
   function messaggioOrdine() {
+    const z = inConsegna() ? zona(form.zona) : null;
     const r = ["*NUOVO ORDINE MURAMASA* 🍣"];
     if (form.codice) r.push("🔖 *Codice:* " + form.codice);
-    r.push(
-      "",
-      "👤 *Cliente:* " + form.nome,
-      "🛍️ *Modalità:* ritiro al locale",
-      "🕒 *Ritiro:* " + form.ritiro,
-      "📍 *Provenienza:* " + PROVENIENZA
-    );
+    r.push("", "👤 *Cliente:* " + form.nome);
+    if (z) r.push("🛵 *Modalità:* consegna a casa", "🏠 *Indirizzo:* " + form.indirizzo + ", " + z.nome, "🕒 *Consegna:* " + form.ritiro);
+    else r.push("🛍️ *Modalità:* ritiro al locale", "🕒 *Ritiro:* " + form.ritiro);
+    r.push("📍 *Provenienza:* " + PROVENIENZA);
     if (form.note) r.push("📝 *Note:* " + form.note);
     r.push("", "----------------------------");
     Object.keys(cart).forEach(id => {
       const it = CATALOGO.get(id);
       r.push("▪️ " + cart[id] + "x " + it.nome + " (" + money(it.prezzo) + ")");
     });
-    r.push("----------------------------", "💰 *TOTALE: " + money(total()) + "*");
+    if (z) r.push("🛵 Consegna " + aCitta(z.nome) + " (" + money(z.costo) + ")");
+    r.push("----------------------------", "💰 *TOTALE: " + money(totaleOrdine()) + "*");
     return r.join("\n");
   }
 
@@ -919,18 +1023,26 @@ const FRASI = {
     form.nome = $("o-nome").value.trim();
     form.ritiro = $("o-ritiro").value.trim();
     form.note = $("o-note").value.trim();
-    const err = $("o-err");
-    if (!form.nome) { err.textContent = "Scrivi il tuo nome per ordinare."; err.hidden = false; $("o-nome").focus(); return; }
-    if (!form.ritiro) { err.textContent = "Scegli quando passi a ritirare."; err.hidden = false; $("o-ritiro").focus(); return; }
+    const consegna = inConsegna();
+    if (consegna) { form.zona = $("o-zona").value; form.indirizzo = $("o-indirizzo").value.trim(); }
+    const avvisa = (id, testo) => { const err = $("o-err"); err.textContent = testo; err.hidden = false; if (id) $(id).focus(); };
+    if (!form.nome) return avvisa("o-nome", "Scrivi il tuo nome per ordinare.");
+    if (consegna && !pianoConsegna(pianoRitiro()).ok) { renderOrdine(); return avvisa("", "La consegna per oggi non è più disponibile: puoi passare a ritirare."); }
+    if (consegna && !zona(form.zona)) return avvisa("o-zona", "Scegli il comune per la consegna.");
+    if (consegna && !form.indirizzo) return avvisa("o-indirizzo", "Scrivi via e numero civico per la consegna.");
+    if (!form.ritiro) return avvisa("o-ritiro", consegna ? "Scegli quando te lo portiamo." : "Scegli quando passi a ritirare.");
     // Lo stesso ordine reinviato entro 30 minuti tiene il suo codice e non si registra due volte
-    const firma = JSON.stringify([cart, form.nome, form.ritiro, form.note]);
+    const firma = JSON.stringify([cart, form.nome, form.ritiro, form.note, form.modo, form.zona, form.indirizzo]);
     if (ultimoInvio && ultimoInvio.firma === firma && Date.now() - ultimoInvio.quando < 30 * 60000) {
       form.codice = ultimoInvio.codice;
     } else {
       form.codice = nuovoCodice();
+      // Nel registro va il comune, non la via: l'indirizzo completo resta solo nel messaggio WhatsApp.
       registra({
-        tipo: "Ordine", codice: form.codice, nome: form.nome, modalita: "Ritiro", ritiro: form.ritiro, note: form.note,
-        righe: Object.keys(cart).map(id => ({ q: cart[id], nome: CATALOGO.get(id).nome })), totale: total()
+        tipo: "Ordine", codice: form.codice, nome: form.nome, modalita: consegna ? "Consegna" : "Ritiro",
+        ritiro: consegna ? form.zona + ", " + form.ritiro : form.ritiro,
+        note: consegna ? "Consegna " + money(costoConsegna()) + (form.note ? " · " + form.note : "") : form.note,
+        righe: Object.keys(cart).map(id => ({ q: cart[id], nome: CATALOGO.get(id).nome })), totale: totaleOrdine()
       });
       ultimoInvio = { firma: firma, codice: form.codice, quando: Date.now() };
     }
@@ -996,9 +1108,9 @@ const FRASI = {
     const contatto = CONFIG.email ? "l'indirizzo email " + esc(CONFIG.email) : "WhatsApp o telefono al " + esc(CONFIG.telefono);
     $("privacy-body").innerHTML =
       "<h3>Chi tratta i dati</h3><p>Il titolare del trattamento è " + esc(CONFIG.titolare) + ", " + esc(CONFIG.via) + ", " + esc(CONFIG.cap + " " + CONFIG.citta + " (" + CONFIG.provincia + ")") + ", P.IVA " + esc(CONFIG.piva) + ". Per qualsiasi richiesta puoi scrivere a " + contatto + ".</p>" +
-      "<h3>Quali dati e perché</h3><p>Il sito è un menu digitale e non ci sono account. Nome, piatti, orario e note che inserisci servono a comporre il messaggio che invii su WhatsApp, per preparare il tuo ordine o la tua richiesta." +
+      "<h3>Quali dati e perché</h3><p>Il sito è un menu digitale e non ci sono account. Nome, piatti, orario e note che inserisci, e l'indirizzo se scegli la consegna, servono a comporre il messaggio che invii su WhatsApp, per preparare il tuo ordine o la tua richiesta." +
       (CONFIG.registro
-        ? " Quando premi invia, gli stessi dati vengono annotati anche nel nostro registro ordini, un foglio Google privato che usiamo solo per gestire gli ordini e tenere la contabilità.</p>"
+        ? " Quando premi invia, gli stessi dati vengono annotati anche nel nostro registro ordini (per la consegna solo il comune, non la via), un foglio Google privato che usiamo solo per gestire gli ordini e tenere la contabilità.</p>"
         : " Non li salviamo su un nostro database.</p>") +
       "<h3>Dopo l'invio</h3><p>Il messaggio viaggia su WhatsApp, secondo le regole di Meta. " + (CONFIG.registro ? "Messaggi e registro li conserviamo" : "Lo conserviamo") + " per il tempo necessario a gestire l'ordine e per gli obblighi di legge.</p>" +
       "<h3>I tuoi diritti</h3><p>Puoi chiedere in ogni momento di accedere ai tuoi dati, correggerli o cancellarli (articoli 15–22 del Regolamento UE 2016/679), scrivendo a " + contatto + ".</p>" +
@@ -1057,8 +1169,15 @@ const FRASI = {
 
   /* ---------- Clic ---------- */
   document.addEventListener("click", e => {
-    const t = e.target.closest("[data-add],[data-remove],[data-open],[data-close],[data-filter],[data-gift],[data-posti],#invia,#svuota,#riprova,#gift-send,#sg-send,#reset,#hero-art");
+    const t = e.target.closest("[data-add],[data-remove],[data-open],[data-close],[data-filter],[data-gift],[data-posti],[data-modo],#invia,#svuota,#riprova,#gift-send,#sg-send,#reset,#hero-art");
     if (!t) return;
+    if (t.dataset.modo) {
+      form.modo = t.dataset.modo;
+      renderOrdine();
+      const b = document.querySelector('[data-modo="' + form.modo + '"]');
+      if (b) b.focus({ preventScroll: true });
+      return;
+    }
     if (t.dataset.add) return change(t.dataset.add, 1);
     if (t.dataset.remove) return change(t.dataset.remove, -1);
     if (t.dataset.open) return openDialog(t.dataset.open);
@@ -1079,11 +1198,13 @@ const FRASI = {
   document.addEventListener("input", e => {
     if (e.target.id === "o-nome") form.nome = e.target.value;
     if (e.target.id === "o-note") form.note = e.target.value;
+    if (e.target.id === "o-indirizzo") form.indirizzo = e.target.value;
     if (e.target.id === "gift-altro" && e.target.value) { giftImporto = 0; renderGift(); }
     if (e.target.id === "search") { query = plain(e.target.value.trim()); applicaFiltri(); }
   });
   document.addEventListener("change", e => {
     if (e.target.id === "o-ritiro") form.ritiro = e.target.value;
+    if (e.target.id === "o-zona") { form.zona = e.target.value; renderPiede(); }
     if (e.target.id === "sg-data") renderOreSgabello();
   });
 
